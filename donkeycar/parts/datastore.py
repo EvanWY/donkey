@@ -79,7 +79,16 @@ class Tub(object):
         return -1
 
     def update_df(self):
-        df = pd.DataFrame([self.get_json_record(i) for i in self.get_index(shuffled=False)])
+        records = []
+        for i in self.get_index(shuffled=False):
+            try:
+                record = self.get_json_record(i)
+                records.append(record)
+            except:
+                logger.error('error: {}'.format(sys.exc_info()[0]))
+                continue
+
+        df = pd.DataFrame(records)
         self.df = df
 
     def get_df(self):
@@ -224,7 +233,7 @@ class Tub(object):
         except FileNotFoundError:
             raise
         except:
-            logger.error('Unexpected error: {}'.format(sys.exc_info()[0]))
+            logger.error('Unexpected error: {} while decoding {}'.format(sys.exc_info()[0], path))
             raise
 
         record_dict = self.make_record_paths_absolute(json_data)
@@ -242,7 +251,7 @@ class Tub(object):
 
             # load objects that were saved as separate files
             if typ == 'image_array':
-                img = Image.open((val))
+                img = Image.open((val))#.resize((160,120), Image.BILINEAR)
                 val = np.array(img)
 
             data[key] = val
@@ -289,9 +298,11 @@ class Tub(object):
             df = self.get_df()
 
         while True:
-            for _ in self.df.iterrows():
+            for row in self.df.iterrows():
                 if shuffle:
                     record_dict = df.sample(n=1).to_dict(orient='record')[0]
+                else:
+                    record_dict = row[1].to_dict()
 
                 record_dict = self.read_record(record_dict)
 

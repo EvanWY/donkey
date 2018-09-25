@@ -3,6 +3,7 @@ env/*
 data/*
 dist/*
 tub/*
+tub1/*
 
 *.pyc
 .ipynb_checkpoints

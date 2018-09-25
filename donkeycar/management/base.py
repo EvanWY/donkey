@@ -8,7 +8,8 @@ import argparse
 import donkeycar as dk
 from donkeycar.parts.datastore import Tub
 from .tub import TubManager
-
+from PIL import Image
+import numpy as np
 
 PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 TEMPLATES_PATH = os.path.join(PACKAGE_PATH, 'templates')
@@ -162,6 +163,7 @@ class MakeMovie(BaseCommand):
     def parse_args(self, args):
         parser = argparse.ArgumentParser(prog='makemovie')
         parser.add_argument('--tub', help='The tub to make movie from')
+        parser.add_argument('--model', help='the model to use for predictions')
         parser.add_argument('--out', default='tub_movie.mp4', help='The movie filename to create. default: tub_movie.mp4')
         parser.add_argument('--config', default='./config.py', help='location of config file to use. default: ./config.py')
         parsed_args = parser.parse_args(args)
@@ -172,6 +174,7 @@ class MakeMovie(BaseCommand):
         Load the images from a tub and create a movie from them.
         Movie
         """
+        from donkeycar.parts.keras import KerasCategorical
         import moviepy.editor as mpy
 
 
@@ -193,9 +196,15 @@ class MakeMovie(BaseCommand):
         except:
             print("Exception while loading config from", conf)
             return
+        
+        model_path = os.path.expanduser(args.model)
+        self.model = KerasCategorical()
+        self.model.load(model_path)
+        self.smooth_user_angle = 0
+        self.smooth_pilot_angle = 0
 
         self.tub = Tub(args.tub)
-        self.num_rec = self.tub.get_num_records()
+        self.num_rec = 1000#self.tub.get_num_records()
         self.iRec = 0
 
         print('making movie', args.out, 'from', self.num_rec, 'images')
@@ -216,8 +225,28 @@ class MakeMovie(BaseCommand):
         if self.iRec >= self.num_rec - 1:
             return None
 
-        rec = self.tub.get_record(self.iRec)
+        rec = self.tub.get_record(self.iRec + 1000)
         image = rec['cam/image_array']
+
+        user_angle = float(rec["user/angle"])
+        user_throttle = float(rec["user/throttle"])
+        pilot_angle, pilot_throttle = self.model.run(np.array(Image.fromarray(image).resize((160,120),Image.BICUBIC)))
+        self.smooth_user_angle = self.smooth_user_angle * 0.7 + user_angle * 0.3
+        self.smooth_pilot_angle = self.smooth_pilot_angle * 0.7 + float(pilot_angle) * 0.3
+
+        for i in range(300):
+            x = i / 300
+            width = int(20*(1-(0.9*x)))
+            yp = self.smooth_pilot_angle * ((x+1)**2)
+            jp = int(320+yp*160)
+            yu = self.smooth_user_angle * ((x+1)**2)
+            ju = int(320+yu*160)
+            image[479-i, jp-width:jp+width, :] = 0
+            image[479-i, ju-width:ju+width, :] = 0
+            image[479-i, jp-width:jp+width, 0] = 255
+            image[479-i, ju-width:ju+width, 2] = 255
+
+
 
         return image # returns a 8-bit RGB array
 
@@ -371,6 +400,8 @@ class ShowPredictionPlots(BaseCommand):
         """
         from donkeycar.parts.datastore import TubGroup
         from donkeycar.parts.keras import KerasCategorical
+        from matplotlib import pyplot as plt
+        import pandas as pd
 
         tg = TubGroup(tub_paths)
 
@@ -378,7 +409,7 @@ class ShowPredictionPlots(BaseCommand):
         model = KerasCategorical()
         model.load(model_path)
 
-        gen = tg.get_batch_gen(None, None, batch_size=len(tg.df),shuffle=False, df=tg.df)
+        gen = tg.get_batch_gen(batch_size=len(tg.df),shuffle=False, df=tg.df)
         arr = next(gen)
 
         user_angles = []
