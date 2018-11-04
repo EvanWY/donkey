@@ -4,6 +4,7 @@ data/*
 dist/*
 tub/*
 tub1/*
+models/*
 
 *.pyc
 .ipynb_checkpoints
