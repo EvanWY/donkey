@@ -20,11 +20,12 @@ import donkeycar as dk
 #import parts
 from donkeycar.parts.camera import PiCamera
 from donkeycar.parts.transform import Lambda
-from donkeycar.parts.keras import KerasCategorical
+#from donkeycar.parts.keras import KerasCategorical
 from donkeycar.parts.actuator import PCA9685, PWMSteering, PWMThrottle
 from donkeycar.parts.datastore import TubGroup, TubWriter
 from donkeycar.parts.controller import LocalWebController, JoystickController
 from donkeycar.parts.clock import Timestamp
+from donkeycar.parts.line_follower import LineFollower
 
 
 def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
@@ -46,20 +47,6 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     cam = PiCamera(resolution=cfg.CAMERA_RESOLUTION)
     V.add(cam, outputs=['cam/image_array'], threaded=True)
 
-    if use_joystick or cfg.USE_JOYSTICK_AS_DEFAULT:
-        ctr = JoystickController(max_throttle=cfg.JOYSTICK_MAX_THROTTLE,
-                                 steering_scale=cfg.JOYSTICK_STEERING_SCALE,
-                                 auto_record_on_throttle=cfg.AUTO_RECORD_ON_THROTTLE)
-    else:
-        # This web controller will create a web server that is capable
-        # of managing steering, throttle, and modes, and more.
-        ctr = LocalWebController(use_chaos=use_chaos)
-
-    V.add(ctr,
-          inputs=['cam/image_array'],
-          outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'],
-          threaded=True)
-
     # See if we should even run the pilot module.
     # This is only needed because the part run_condition only accepts boolean
     def pilot_condition(mode):
@@ -73,13 +60,33 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
                                 outputs=['run_pilot'])
 
     # Run the pilot if the mode is not user.
-    kl = KerasCategorical()
-    if model_path:
-        kl.load(model_path)
+    driver = LineFollower()
 
-    V.add(kl, inputs=['cam/image_array'],
-              outputs=['pilot/angle', 'pilot/throttle'],
-              run_condition='run_pilot')
+    V.add(driver, inputs=['cam/image_array'],
+              outputs=['pilot/angle', 'pilot/throttle', 'debug/visualize_image'])
+
+    if use_joystick or cfg.USE_JOYSTICK_AS_DEFAULT:
+        ctr = JoystickController(max_throttle=cfg.JOYSTICK_MAX_THROTTLE,
+                                 steering_scale=cfg.JOYSTICK_STEERING_SCALE,
+                                 auto_record_on_throttle=cfg.AUTO_RECORD_ON_THROTTLE)
+    else:
+        # This web controller will create a web server that is capable
+        # of managing steering, throttle, and modes, and more.
+        ctr = LocalWebController(use_chaos=use_chaos)
+
+    V.add(ctr,
+          inputs=['debug/visualize_image'],
+          outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'],
+          threaded=True)
+
+    # Run the pilot if the mode is not user.
+    # kl = KerasCategorical()
+    # if model_path:
+    #     kl.load(model_path)
+
+    # V.add(kl, inputs=['cam/image_array'],
+    #           outputs=['pilot/angle', 'pilot/throttle'],
+    #           run_condition='run_pilot')
 
     # Choose what inputs should change the car.
     def drive_mode(mode,
