@@ -8,6 +8,7 @@ class ConeSideDriver:
         target = None
         for detection in detections:
             if target is None or (target['n1'] - target['n0']) < (detection['n1'] - detection['n0']):
+                target = detection
         
         if target is None:
             targetPos = 160
@@ -18,5 +19,5 @@ class ConeSideDriver:
 
         steer = shift
 
-        return 0, 0.7
+        return steer, 0.7
 
