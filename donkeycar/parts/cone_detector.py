@@ -14,6 +14,8 @@ class ConeDetector:
         chv_larger_threshold = yuv_channel_v > 160
         chv_col_orange_count = np.sum(chv_larger_threshold, axis=0)
 
+        print (chv_col_orange_count)
+
         chv_col_has_orange = (chv_col_orange_count > 0).tolist()
         chv_col_has_orange.append(False)
         curr_begin = 0
@@ -28,7 +30,6 @@ class ConeDetector:
                     detections.append({'n0':curr_begin, 'n1':curr_end})
         
         ## debug image
-        print (len(detections))
         for detection in detections:
             n0 = detection['n0']
             n1 = detection['n1']
