@@ -19,5 +19,5 @@ class ConeSideDriver:
 
         steer = shift
 
-        return steer, 0.7
+        return steer, 0
 
