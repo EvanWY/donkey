@@ -4,6 +4,9 @@ import matplotlib
 import cv2
 
 class ConeSideDriver:
+    def __init__(self):
+        self.last_shift = 0
+
     def run(self, detections):
         target = None
         for detection in detections:
@@ -17,7 +20,9 @@ class ConeSideDriver:
 
         shift = (targetPos - 150) / 150.0
 
-        steer = shift*4
+        steer = shift * 2 + (shift-self.last_shift) * 0.1
+
+        self.last_shift = shift
 
         return steer, 0.2
 
