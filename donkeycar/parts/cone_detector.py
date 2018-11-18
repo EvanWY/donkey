@@ -4,23 +4,16 @@ import cv2
 
 class ConeDetector:
     def run(self, img_arr):
+        img_vis = np.copy(img_arr)
+
         nclip = int(img_arr.shape[0] * 0.35)
         img_clip = img_arr[nclip:-nclip,:,:]
         yuv = cv2.cvtColor(img_clip, cv2.COLOR_BGR2YUV)
         yuv_channel_v = yuv[:,:,2]
 
-        # detections = []
-        # x, y = np.unravel_index(yuv_channel_v.argmax(), yuv_channel_v.shape)
-        # detections.append([x,y])
-
-        #detections = np.argwhere(yuv_channel_v > 160)
-
         chv_larger_threshold = yuv_channel_v > 160
         chv_col_orange_count = np.sum(chv_larger_threshold, axis=0)
 
-        #inds = np.argwhere(chv_count > 0)
-        #height = chv_count[inds] * 5
-        #detections = np.hstack([height, inds])
         chv_col_has_orange = (chv_col_orange_count > 0).tolist()
         chv_col_has_orange.append(False)
         curr_begin = 0
@@ -33,8 +26,16 @@ class ConeDetector:
                 curr_end = n
                 if curr_end > curr_begin + 1:
                     detections.append({'n0':curr_begin, 'n1':curr_end})
+        
+        ## debug image
+        for detection in detections:
+            n0 = detection['n0']
+            n1 = detection['n1']
+            m0 = 60 - (n1-n0)
+            m1 = 60 + (n1-n0)
+            cv2.rectangle(img_vis, (n0, m0), (n1, m1), [255,0,0], thickness=1, lineType=8, shift=0)
 
-        return detections, yuv_channel_v
+        return detections, img_vis
 
 
 if __name__ == '__main__':
