@@ -25,6 +25,7 @@ from donkeycar.parts.actuator import PCA9685, PWMSteering, PWMThrottle
 from donkeycar.parts.datastore import TubGroup, TubWriter
 from donkeycar.parts.controller import LocalWebController, JoystickController
 from donkeycar.parts.clock import Timestamp
+from donkeycar.parts.cone_detector import ConeDetector
 from donkeycar.parts.line_follower import LineFollower
 
 
@@ -60,8 +61,11 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
                                 outputs=['run_pilot'])
 
     # Run the pilot if the mode is not user.
-    driver = LineFollower()
+    cone_detector = ConeDetector()
+    V.add(cone_detector, inputs=['cam/image_array'],
+              outputs=['pilot/angle', 'pilot/throttle', 'debug/visualize_image'])
 
+    driver = LineFollower()
     V.add(driver, inputs=['cam/image_array'],
               outputs=['pilot/angle', 'pilot/throttle', 'debug/visualize_image'])
 

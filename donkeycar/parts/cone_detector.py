@@ -34,7 +34,7 @@ class ConeDetector:
                 if curr_end > curr_begin + 1:
                     detections.append({'n0':curr_begin, 'n1':curr_end})
 
-        return yuv_channel_v, detections
+        return detections, yuv_channel_v
 
 
 if __name__ == '__main__':
