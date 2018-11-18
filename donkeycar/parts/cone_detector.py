@@ -8,10 +8,10 @@ class ConeDetector:
 
         nclip = int(img_arr.shape[0] * 0.35)
         img_clip = img_arr[nclip:-nclip,:,:]
-        yuv = cv2.cvtColor(img_clip, cv2.COLOR_BGR2YUV)
+        yuv = cv2.cvtColor(img_clip, cv2.COLOR_RGB2YUV)
         yuv_channel_v = yuv[:,:,2]
 
-        chv_larger_threshold = yuv_channel_v < 100
+        chv_larger_threshold = yuv_channel_v > 160
         chv_col_orange_count = np.sum(chv_larger_threshold, axis=0)
 
         print (chv_col_orange_count)
