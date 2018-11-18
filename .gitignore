@@ -5,6 +5,9 @@ dist/*
 tub/*
 tub1/*
 models/*
+temp/*
+
+tub_movie.mp4
 
 *.pyc
 .ipynb_checkpoints
