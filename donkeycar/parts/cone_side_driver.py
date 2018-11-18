@@ -24,7 +24,7 @@ class ConeSideDriver:
         steer = shift * 2 + (shift-self.last_shift) * 0.1
 
         self.last_shift = shift
-        self.prev_target_pose = targetPose
+        self.prev_target_pose = targetPos
 
         return steer, 0.2
 
