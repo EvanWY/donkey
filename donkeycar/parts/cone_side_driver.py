@@ -11,13 +11,13 @@ class ConeSideDriver:
                 target = detection
         
         if target is None:
-            targetPos = 160
+            targetPos = 300
         else:
             targetPos = (target['n1'] + target['n0']) / 2
 
         shift = (targetPos - 150) / 150.0
 
-        steer = shift
+        steer = shift*4
 
         return steer, 0.2
 
