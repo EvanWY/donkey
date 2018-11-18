@@ -11,7 +11,7 @@ class ConeDetector:
         yuv = cv2.cvtColor(img_clip, cv2.COLOR_BGR2YUV)
         yuv_channel_v = yuv[:,:,2]
 
-        chv_larger_threshold = yuv_channel_v > 160
+        chv_larger_threshold = yuv_channel_v > 140
         chv_col_orange_count = np.sum(chv_larger_threshold, axis=0)
 
         print (chv_col_orange_count)
