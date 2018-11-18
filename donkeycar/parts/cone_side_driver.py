@@ -15,7 +15,7 @@ class ConeSideDriver:
                 target = detection
         
         if target is None:
-            targetPos = self.prev_target_pose + 1
+            targetPos = self.prev_target_pose + 10
         else:
             targetPos = (target['n1'] + target['n0']) / 2
 
