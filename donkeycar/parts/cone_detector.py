@@ -4,8 +4,6 @@ import cv2
 
 class ConeDetector:
     def run(self, img_arr):
-        img_vis = np.copy(img_arr)
-
         nclip = int(img_arr.shape[0] * 0.35)
         img_clip = img_arr[nclip:-nclip,:,:]
         yuv = cv2.cvtColor(img_clip, cv2.COLOR_RGB2YUV)
@@ -28,12 +26,14 @@ class ConeDetector:
                     detections.append({'n0':curr_begin, 'n1':curr_end})
         
         ## debug image
+        img_vis = np.copy(img_arr)
         for detection in detections:
             n0 = detection['n0']
             n1 = detection['n1']
             m0 = 60 - (n1-n0)
             m1 = 60 + (n1-n0)
             cv2.rectangle(img_vis, (n0, m0), (n1, m1), [255,0,0], thickness=1, lineType=8, shift=0)
+        ## debug end
 
         return detections, img_vis
 

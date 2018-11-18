@@ -26,7 +26,7 @@ from donkeycar.parts.datastore import TubGroup, TubWriter
 from donkeycar.parts.controller import LocalWebController, JoystickController
 from donkeycar.parts.clock import Timestamp
 from donkeycar.parts.cone_detector import ConeDetector
-from donkeycar.parts.line_follower import LineFollower
+from donkeycar.parts.cone_side_driver import ConeSideDriver
 
 
 def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
@@ -65,9 +65,9 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     V.add(cone_detector, inputs=['cam/image_array'],
               outputs=['detections', 'debug/visualize_image'])
 
-    driver = LineFollower()
-    V.add(driver, inputs=['cam/image_array'],
-              outputs=['pilot/angle', 'pilot/throttle', 'debug/visualize_image2'])
+    driver = ConeSideDriver()
+    V.add(driver, inputs=['detections'],
+              outputs=['pilot/angle', 'pilot/throttle'])
 
     if use_joystick or cfg.USE_JOYSTICK_AS_DEFAULT:
         ctr = JoystickController(max_throttle=cfg.JOYSTICK_MAX_THROTTLE,
