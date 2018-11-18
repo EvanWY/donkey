@@ -63,11 +63,11 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     # Run the pilot if the mode is not user.
     cone_detector = ConeDetector()
     V.add(cone_detector, inputs=['cam/image_array'],
-              outputs=['pilot/angle', 'pilot/throttle', 'debug/visualize_image'])
+              outputs=['detections', 'debug/visualize_image'])
 
     driver = LineFollower()
     V.add(driver, inputs=['cam/image_array'],
-              outputs=['pilot/angle', 'pilot/throttle', 'debug/visualize_image'])
+              outputs=['pilot/angle', 'pilot/throttle', 'debug/visualize_image2'])
 
     if use_joystick or cfg.USE_JOYSTICK_AS_DEFAULT:
         ctr = JoystickController(max_throttle=cfg.JOYSTICK_MAX_THROTTLE,
