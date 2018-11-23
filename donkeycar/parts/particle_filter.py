@@ -5,7 +5,12 @@ PARTICLE_INIT_X_Y_SCALE = 100
 PARTICLE_NUMBER = 1000
 FORWARD_NOISE = 0.05
 TURN_NOISE = 0.05
-SENSE_NOISE = 5.0
+
+SENSE_PHI_STDDEV = 0.13
+SENSE_LOG_R_STDDEV = 
+
+MAX_POLAR_DIST_ALLOW = 5.0
+POLAR_DIST_PHI_SCALE_FACTOR = 4.5
 
 landmarks = [[20.0, 20.0], [20.0, 80.0], [20.0, 50.0],
              [50.0, 20.0], [50.0, 80.0], [80.0, 80.0],
@@ -38,16 +43,62 @@ class Particle:
         self.x += forward_dist * math.cos(self.theta)
         self.y += forward_dist * math.sin(self.theta)
     
+    # measurement: [[r, phi], [r, phi], .. ]
     def update_weight(self, measurement):
-        prob = 1.0
-        for i in range(len(landmarks)):
-            dist = math.sqrt((self.x - landmarks[i][0]) ** 2 + (self.y - landmarks[i][1]) ** 2)
-            prob *= self.gaussian(dist, self.sense_noise, measurement[i])
-        self.weight = prob
+        # prob = 1.0
+        # for i in range(len(landmarks)):
+        #     dist = math.sqrt((self.x - landmarks[i][0]) ** 2 + (self.y - landmarks[i][1]) ** 2)
+        #     prob *= self.gaussian(dist, self.sense_noise, measurement[i])
+        # self.weight = prob
 
+        prob = 1.0
+        cosT = math.cos(self.theta)
+        sinT = math.sin(self.theta)
+
+        polar_landmarks = []
+
+        for lm in landmarks:
+            dx = lm[0] - self.x
+            dy = lm[1] - self.y
+            lm_x = dx * cosT + dy * sinT
+            lm_y = - dx * sinT + dy * cosT
+            r = math.sqrt(lm_x ** 2 + lm_y ** 2)
+            phi = math.atan2(lm_y, lm_x)
+            polar_landmarks.append([r, phi])
+
+        def polar_dist(lhs, rhs):
+            phi_dist = (lhs[1] - rhs[1]) ** 2
+            phi_dist *= POLAR_DIST_PHI_SCALE_FACTOR
+            
+            r_dist = 0
+            if (lhs[0] > rhs[0]):
+                r_dist = lhs[0] / rhs[0]
+            else:
+                r_dist = rhs[0] / lhs[0]
+            r_dist -= 1
+            
+            return phi_dist + r_dist
+
+        for polar_lm in polar_landmarks:
+            closest_meas = None
+            min_dist = None
+            for meas in measurement:
+                dist = polar_dist(polar_lm, meas)
+                if dist > MAX_POLAR_DIST_ALLOW:
+                    continue
+                elif (not min_dist) or min_dist > dist:
+                    closest_meas = meas
+                    min_dist = dist
+            
+            if min_dist
+            
+
+        
+        self.weight = prob
+            
     @staticmethod
-    def gaussian(mu, sigma, x):
-        return math.exp(- ((mu - x) ** 2) / (sigma ** 2) / 2.0) / math.sqrt(2.0 * math.pi * (sigma ** 2))
+    def gaussian(sigma, x):
+        return math.exp(- (x ** 2) / (sigma ** 2) / 2.0) / math.sqrt(2.0 * math.pi * (sigma ** 2))
 
 
 class ParticleFilter:
@@ -156,7 +207,7 @@ if __name__ == '__main__':
     robot = Robot(0,0,SENSE_NOISE)
     robot.x = 55
     robot.y = 30
-    robot.theta = 120
+    robot.theta = math.pi * 0.5
 
     for i in range(30):
         if i < 3 or i % 5 == 0:
