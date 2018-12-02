@@ -10,7 +10,7 @@ SENSE_PHI_STDDEV = 0.13
 SENSE_LOG_R_STDDEV = 0.01
 
 MAX_POLAR_DIST_ALLOW = 5.0
-POLAR_DIST_PHI_SCALE_FACTOR = 4.5
+POLAR_DIST_PHI_SCALE_FACTOR = 450
 
 SENSE_DISTANCE_RANGE = [1, 100]
 SENSE_FOV_RANGE = [-0.333 * pi, 0.333 * pi]
@@ -118,9 +118,9 @@ class Particle:
 
         self.weight = prob
             
-    @staticmethod
-    def gaussian(sigma, x):
-        return exp(- (x ** 2) / (sigma ** 2) / 2.0) / sqrt(2.0 * pi * (sigma ** 2))
+    # @staticmethod
+    # def gaussian(sigma, x):
+    #     return exp(- (x ** 2) / (sigma ** 2) / 2.0) / sqrt(2.0 * pi * (sigma ** 2))
 
 
 class ParticleFilter:
@@ -170,6 +170,8 @@ def visualization(robot, step, p, pr, meas):
  
     # draw particles
     for ind in range(len(p)):
+        if ind % 50 != 3:
+            continue
  
         # particle
         circle = plt.Circle((p[ind].x, p[ind].y), 1., facecolor='#ffb266', edgecolor='#994c00', alpha=0.5)
@@ -215,7 +217,7 @@ def visualization(robot, step, p, pr, meas):
  
     figname = "figure_" + str(step) + ".png"
     plt.savefig(figname)
-    print('Saved',figname)
+    #print('Saved',figname)
     plt.clf()
     #plt.show()
 
@@ -236,8 +238,9 @@ class Robot(Particle):
             if phi < SENSE_FOV_RANGE[0] or phi > SENSE_FOV_RANGE[1] or r < SENSE_DISTANCE_RANGE[0] or r > SENSE_DISTANCE_RANGE[1]:
                 continue
             else:
-                z.append([exp(self.gaussian(0.5, log(r))), self.gaussian(0.01, phi)])
+                #z.append([exp(self.gaussian(0.5, log(r))), self.gaussian(0.01, phi)])
                 #z.append([r, phi])
+                z.append([exp(random.gauss(log(r), 0.69)), random.gauss(phi, 0.1)])
         return z
             
 
@@ -253,7 +256,7 @@ if __name__ == '__main__':
     steer, throttle = 3, 150
 
     meas = []
-    for i in range(150):
+    for i in range(500):
 
         dx = 50 - robot.x
         dy = 50 - robot.y
@@ -264,9 +267,23 @@ if __name__ == '__main__':
         v = (phi / pi) * (r / 75.0) * 10
         steer = 50.0 / (1.0 + e ** (-v)) - 25.0
         throttle = 200 - 3.0 * r
-        print phi, r, v, steer
 
-        if i < 5 or i % 15 == 0:
+        sum_dist = 0
+        for p in particle_filter.particles:
+            dist = sqrt((p.x - robot.x) ** 2 + (p.y - robot.y) ** 2)
+            sum_dist += dist
+        
+        s = ''
+        s += str(i)
+        s += '\t'
+        s += str(int(sum_dist * 0.01))
+        s += '\t'
+        c = int((sum_dist * 0.001 * 0.02) * 70)
+        for i2 in range(c):
+            s += '-'
+        print s
+
+        if i < 5 or i % 10 == 0:
             visualization(robot, i, particle_filter.particles, [], meas)
             
         robot.move(steer * delta_time, throttle * delta_time)
