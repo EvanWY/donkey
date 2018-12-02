@@ -1,34 +1,36 @@
-import math
+from math import *
 import random
 
 PARTICLE_INIT_X_Y_SCALE = 100
 PARTICLE_NUMBER = 1000
-FORWARD_NOISE = 0.05
-TURN_NOISE = 0.05
+FORWARD_NOISE = 0.5
+TURN_NOISE = 0.5
 
 SENSE_PHI_STDDEV = 0.13
-SENSE_LOG_R_STDDEV = 
+SENSE_LOG_R_STDDEV = 0.01
 
 MAX_POLAR_DIST_ALLOW = 5.0
 POLAR_DIST_PHI_SCALE_FACTOR = 4.5
 
-landmarks = [[20.0, 20.0], [20.0, 80.0], [20.0, 50.0],
-             [50.0, 20.0], [50.0, 80.0], [80.0, 80.0],
-             [80.0, 20.0], [80.0, 50.0]]
+SENSE_DISTANCE_RANGE = [1, 100]
+SENSE_FOV_RANGE = [-0.333 * pi, 0.333 * pi]
+
+landmarks = [[20.0, 20.0], [34.0, 28.0], [50.0, 60.0],
+             [75.0, 90.0], [54.0, 70.0], [60.0, 80.0],
+             [70.0, 20.0], [66.0, 33.0]]
 
 class Particle:
-    def __init__(self, turn_noise, forward_noise, sense_noise):
-        self.x = random.random() * PARTICLE_INIT_X_Y_SCALE
-        self.y = random.random() * PARTICLE_INIT_X_Y_SCALE
-        self.theta = random.random() * 2.0 * math.pi
+    def __init__(self, turn_noise, forward_noise):
+        self.x = random.random() * PARTICLE_INIT_X_Y_SCALE * 0.5 + PARTICLE_INIT_X_Y_SCALE * 0.25
+        self.y = random.random() * PARTICLE_INIT_X_Y_SCALE * 0.5 + PARTICLE_INIT_X_Y_SCALE * 0.25
+        self.theta = random.random() * 2.0 * pi
         self.weight = 1.0
 
         self.turn_noise = turn_noise
         self.forward_noise = forward_noise
-        self.sense_noise = sense_noise
     
     def clone(self):
-        new_particle = self.__class__(self.turn_noise, self.forward_noise, self.sense_noise)
+        new_particle = self.__class__(self.turn_noise, self.forward_noise)
         new_particle.x = self.x
         new_particle.y = self.y
         new_particle.theta = self.theta
@@ -37,23 +39,17 @@ class Particle:
 
     def move(self, turn, forward):
         self.theta += turn + random.gauss(0.0, self.turn_noise)
-        self.theta %= 2.0 * math.pi
+        self.theta %= 2.0 * pi
 
         forward_dist = forward + random.gauss(0.0, self.forward_noise)
-        self.x += forward_dist * math.cos(self.theta)
-        self.y += forward_dist * math.sin(self.theta)
+        self.x += forward_dist * cos(self.theta)
+        self.y += forward_dist * sin(self.theta)
     
     # measurement: [[r, phi], [r, phi], .. ]
     def update_weight(self, measurement):
-        # prob = 1.0
-        # for i in range(len(landmarks)):
-        #     dist = math.sqrt((self.x - landmarks[i][0]) ** 2 + (self.y - landmarks[i][1]) ** 2)
-        #     prob *= self.gaussian(dist, self.sense_noise, measurement[i])
-        # self.weight = prob
-
         prob = 1.0
-        cosT = math.cos(self.theta)
-        sinT = math.sin(self.theta)
+        cosT = cos(self.theta)
+        sinT = sin(self.theta)
 
         polar_landmarks = []
 
@@ -62,9 +58,9 @@ class Particle:
             dy = lm[1] - self.y
             lm_x = dx * cosT + dy * sinT
             lm_y = - dx * sinT + dy * cosT
-            r = math.sqrt(lm_x ** 2 + lm_y ** 2)
-            phi = math.atan2(lm_y, lm_x)
-            polar_landmarks.append([r, phi])
+            r = sqrt(lm_x ** 2 + lm_y ** 2)
+            phi = atan2(lm_y, lm_x)
+            polar_landmarks.append([r, phi, False])
 
         def polar_dist(lhs, rhs):
             phi_dist = (lhs[1] - rhs[1]) ** 2
@@ -78,37 +74,62 @@ class Particle:
             r_dist -= 1
             
             return phi_dist + r_dist
+        
+        def calc_ghost_measurement_prob(meas):
+            # x1, x2 = SENSE_DISTANCE_RANGE
+            # y1, y2 = 0.5, 1
 
-        for polar_lm in polar_landmarks:
-            closest_meas = None
+            # x = meas[0]
+            # y = (x - x1) / (x2 - x1) * (y2-y1) + y1
+
+            # return max(min(y, y1), y2)
+            r, phi = meas[0], meas[1]
+            ghost_distance_to_sensor_max_range = polar_dist(meas, [SENSE_DISTANCE_RANGE[1], phi])
+            return 1.0 / exp(ghost_distance_to_sensor_max_range)
+        
+        for meas in measurement:
             min_dist = None
-            for meas in measurement:
-                dist = polar_dist(polar_lm, meas)
+            min_dist_landmark = None
+            for lm in polar_landmarks:
+                dist = polar_dist(lm, meas)
                 if dist > MAX_POLAR_DIST_ALLOW:
                     continue
-                elif (not min_dist) or min_dist > dist:
-                    closest_meas = meas
+                elif not (min_dist and min_dist < dist):
                     min_dist = dist
-            
-            if min_dist
-            
+                    min_dist_landmark = lm
 
+            if min_dist:
+                prob *= (1.0 / exp(min_dist))
+                min_dist_landmark[2] = True
+            else:
+                prob *= calc_ghost_measurement_prob(meas)
         
+        def calc_missing_landmark_prob(landmark):
+            r, phi = landmark[0], landmark[1]
+            if phi < SENSE_FOV_RANGE[0] or phi > SENSE_FOV_RANGE[1] or r < SENSE_DISTANCE_RANGE[0] or r > SENSE_DISTANCE_RANGE[1]:
+                return 1.0
+            else:
+                landmark_distance_to_sensor_max_range = polar_dist(landmark, [SENSE_DISTANCE_RANGE[1], phi])
+                return 1.0 / exp(landmark_distance_to_sensor_max_range)
+
+        for lm in polar_landmarks:
+            if lm[2] == False:
+                prob *= calc_missing_landmark_prob(lm)
+
         self.weight = prob
             
     @staticmethod
     def gaussian(sigma, x):
-        return math.exp(- (x ** 2) / (sigma ** 2) / 2.0) / math.sqrt(2.0 * math.pi * (sigma ** 2))
+        return exp(- (x ** 2) / (sigma ** 2) / 2.0) / sqrt(2.0 * pi * (sigma ** 2))
 
 
 class ParticleFilter:
     def __init__(self):
         self.particles = []
         for _ in range(PARTICLE_NUMBER):
-            self.particles.append(Particle(TURN_NOISE, FORWARD_NOISE, SENSE_NOISE))
+            self.particles.append(Particle(TURN_NOISE, FORWARD_NOISE))
 
-    def run(self, measurement, prev_steer, prev_throttle):
-        delta_time = 0.033
+    def run(self, measurement, prev_steer, prev_throttle, delta_time):
         turn = prev_steer * delta_time
         forward = prev_throttle * delta_time
         max_weight = None
@@ -132,14 +153,13 @@ class ParticleFilter:
             self.particles.append(new_particle)
 
 
-def visualization(robot, step, p, pr):
+def visualization(robot, step, p, pr, meas):
     import matplotlib.pyplot as plt
-    from math import *
     world_size = 100.0
     plt.figure("Robot in the world", figsize=(15., 15.))
     plt.title('Particle filter, step ' + str(step))
-    mng = plt.get_current_fig_manager()
-    mng.window.maxsize(700,700)
+    #mng = plt.get_current_fig_manager()
+    #mng.window.maxsize(700,700)
  
     # draw coordinate grid for plotting
     grid = [0, world_size, 0, world_size]
@@ -175,6 +195,15 @@ def visualization(robot, step, p, pr):
     for lm in landmarks:
         circle = plt.Circle((lm[0], lm[1]), 1., facecolor='#cc0000', edgecolor='#330000')
         plt.gca().add_patch(circle)
+    
+    for m in meas:
+        r, phi = m[0], m[1]
+        sum_phi_theta = phi + robot.theta
+        x = r * cos(sum_phi_theta) + robot.x
+        y = r * sin(sum_phi_theta) + robot.y
+
+        circle = plt.Circle((x, y), 0.5, facecolor='#00cc00', edgecolor='#003300')
+        plt.gca().add_patch(circle)
  
     # robot's location
     circle = plt.Circle((robot.x, robot.y), 1., facecolor='#6666ff', edgecolor='#0000cc')
@@ -194,24 +223,52 @@ def visualization(robot, step, p, pr):
 class Robot(Particle):
     def sense(self):
         z = []
-        for i in range(len(landmarks)):
-            dist = math.sqrt((self.x - landmarks[i][0]) ** 2 + (self.y - landmarks[i][1]) ** 2)
-            dist += random.gauss(0.0, self.sense_noise)
-            z.append(dist)
+        cosT = cos(self.theta)
+        sinT = sin(self.theta)
+        for lm in landmarks:
+            dx = lm[0] - self.x
+            dy = lm[1] - self.y
+            lm_x = dx * cosT + dy * sinT
+            lm_y = - dx * sinT + dy * cosT
+            r = sqrt(lm_x ** 2 + lm_y ** 2)
+            phi = atan2(lm_y, lm_x)
+
+            if phi < SENSE_FOV_RANGE[0] or phi > SENSE_FOV_RANGE[1] or r < SENSE_DISTANCE_RANGE[0] or r > SENSE_DISTANCE_RANGE[1]:
+                continue
+            else:
+                z.append([exp(self.gaussian(0.5, log(r))), self.gaussian(0.01, phi)])
+                #z.append([r, phi])
         return z
+            
 
 if __name__ == '__main__':
     delta_time = 0.033
 
     particle_filter = ParticleFilter()
-    robot = Robot(0,0,SENSE_NOISE)
-    robot.x = 55
+    robot = Robot(0,0)
+    robot.x = 30
     robot.y = 30
-    robot.theta = math.pi * 0.5
+    robot.theta = pi * 0.2
 
-    for i in range(30):
-        if i < 3 or i % 5 == 0:
-            visualization(robot, i, particle_filter.particles, [])
-        robot.move(6 * delta_time, 150 * delta_time)
+    steer, throttle = 3, 150
+
+    meas = []
+    for i in range(150):
+
+        dx = 50 - robot.x
+        dy = 50 - robot.y
+        lm_x = dx * cos(robot.theta) + dy * sin(robot.theta)
+        lm_y = - dx * sin(robot.theta) + dy * cos(robot.theta)
+        r = sqrt(lm_x ** 2 + lm_y ** 2)
+        phi = atan2(lm_y, lm_x)
+        v = (phi / pi) * (r / 75.0) * 10
+        steer = 50.0 / (1.0 + e ** (-v)) - 25.0
+        throttle = 200 - 3.0 * r
+        print phi, r, v, steer
+
+        if i < 5 or i % 15 == 0:
+            visualization(robot, i, particle_filter.particles, [], meas)
+            
+        robot.move(steer * delta_time, throttle * delta_time)
         meas = robot.sense()
-        particle_filter.run(meas, 6, 150)
+        particle_filter.run(meas, steer, throttle, delta_time)
