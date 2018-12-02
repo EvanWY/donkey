@@ -27,6 +27,7 @@ from donkeycar.parts.controller import LocalWebController, JoystickController
 from donkeycar.parts.clock import Timestamp
 from donkeycar.parts.cone_detector import ConeDetector
 from donkeycar.parts.cone_side_driver import ConeSideDriver
+from donkeycar.parts.particle_filter import ParticleFilter
 
 
 def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
@@ -43,7 +44,7 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     V = dk.vehicle.Vehicle()
 
     clock = Timestamp()
-    V.add(clock, outputs=['timestamp'])
+    V.add(clock, outputs=['timestamp', 'delta_seconds'])
 
     cam = PiCamera(resolution=cfg.CAMERA_RESOLUTION)
     V.add(cam, outputs=['cam/image_array'], threaded=True)
@@ -57,17 +58,18 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
             return True
 
     pilot_condition_part = Lambda(pilot_condition)
-    V.add(pilot_condition_part, inputs=['user/mode'],
-                                outputs=['run_pilot'])
+    V.add(pilot_condition_part, inputs=['user/mode'], outputs=['run_pilot'])
 
     # Run the pilot if the mode is not user.
     cone_detector = ConeDetector()
-    V.add(cone_detector, inputs=['cam/image_array'],
-              outputs=['detections', 'debug/visualize_image'])
+    V.add(cone_detector, inputs=['cam/image_array'], outputs=['detections', 'debug/visualize_image'])
+    
+    particle_filter = ParticleFilter()
+    V.add(particle_filter, inputs=['detections', 'angle', 'throttle', 'delta_seconds'], outputs=['debug/visualize_image'])
 
-    driver = ConeSideDriver()
-    V.add(driver, inputs=['detections'],
-              outputs=['pilot/angle', 'pilot/throttle'])
+    # driver = ConeSideDriver()
+    # V.add(driver, inputs=['detections'],
+    #           outputs=['pilot/angle', 'pilot/throttle'])
 
     if use_joystick or cfg.USE_JOYSTICK_AS_DEFAULT:
         ctr = JoystickController(max_throttle=cfg.JOYSTICK_MAX_THROTTLE,

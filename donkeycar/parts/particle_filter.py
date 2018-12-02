@@ -1,7 +1,10 @@
 from math import *
 import random
+import numpy as np
 
-PARTICLE_INIT_X_Y_SCALE = 100
+DEBUG = True
+
+PARTICLE_INIT_X_Y_SCALE = 10
 PARTICLE_NUMBER = 1000
 FORWARD_NOISE = 0.5
 TURN_NOISE = 0.5
@@ -13,11 +16,19 @@ MAX_POLAR_DIST_ALLOW = 5.0
 POLAR_DIST_PHI_SCALE_FACTOR = 450
 
 SENSE_DISTANCE_RANGE = [1, 100]
-SENSE_FOV_RANGE = [-0.333 * pi, 0.333 * pi]
+SENSE_FOV_RANGE = [-0.558, 0.558]
 
-landmarks = [[20.0, 20.0], [34.0, 28.0], [50.0, 60.0],
-             [75.0, 90.0], [54.0, 70.0], [60.0, 80.0],
-             [70.0, 20.0], [66.0, 33.0]]
+# landmarks = [[20.0, 20.0], [34.0, 28.0], [50.0, 60.0],
+#              [75.0, 90.0], [54.0, 70.0], [60.0, 80.0],
+#              [70.0, 20.0], [66.0, 33.0]]
+landmarks = [
+    [0.2745, 7.1675],
+    [4.087, 7.137],
+    [2.379, 4.1175],
+    [0.732, 0.915],
+    [4.1175, 0.915],
+]
+
 
 class Particle:
     def __init__(self, turn_noise, forward_noise):
@@ -128,8 +139,28 @@ class ParticleFilter:
         self.particles = []
         for _ in range(PARTICLE_NUMBER):
             self.particles.append(Particle(TURN_NOISE, FORWARD_NOISE))
+    
+    @staticmethod
+    def cone_detection_to_measurement(detection):
+        measurement = []
+        for d in detection:
+            n1, n0 = d['n1'], d['n0']
+            center = (n1 + n0) * 0.5
+            r = 0.305 * 65/(n1-n0)
+            phi = atan2(-(center - 80), 128.09)
+            measurement.append([r, phi])
+        print (measurement)
+        return measurement
+        
 
-    def run(self, measurement, prev_steer, prev_throttle, delta_time):
+    def run(self, detection, prev_steer, prev_throttle, delta_time):
+        if not prev_steer:
+            prev_steer = 0
+        if not prev_throttle:
+            prev_throttle = 0
+        
+        measurement = self.cone_detection_to_measurement(detection)
+
         turn = prev_steer * delta_time
         forward = prev_throttle * delta_time
         max_weight = None
@@ -151,6 +182,39 @@ class ParticleFilter:
             
             new_particle = prev_particles[index].clone()
             self.particles.append(new_particle)
+        
+        average_pose = [0, 0, 0]
+        for p in self.particles:
+            average_pose[0] += p.x
+            average_pose[1] += p.y
+            average_pose[2] += p.theta
+        average_pose[0] /= PARTICLE_NUMBER
+        average_pose[1] /= PARTICLE_NUMBER
+        average_pose[2] /= PARTICLE_NUMBER
+        
+        if DEBUG:
+            print (average_pose)
+            img = np.zeros([100, 100, 3]).astype(np.uint8)
+            for l in landmarks:
+                xx= int(l[0] * 10)
+                yy= int(l[1] * 10)
+                img[xx, yy, 1] = 255
+                img[xx+1, yy, 1] = 255
+                img[xx, yy+1, 1] = 255
+                img[xx+1, yy+1, 1] = 255
+
+            xx= int(average_pose[0] * 10)
+            yy= int(average_pose[1] * 10)
+            if xx >= 0 and xx < 99 and yy >= 0 and yy < 99:
+                img[xx, yy, 0] = 255
+                img[xx+1, yy, 0] = 255
+                img[xx, yy+1, 0] = 255
+                img[xx+1, yy+1, 0] = 255
+            else:
+                print ('out of range')
+
+        
+        return img
 
 
 def visualization(robot, step, p, pr, meas):
@@ -281,10 +345,10 @@ if __name__ == '__main__':
         c = int((sum_dist * 0.001 * 0.02) * 70)
         for i2 in range(c):
             s += '-'
-        print s
+        print (s)
 
-        if i < 5 or i % 10 == 0:
-            visualization(robot, i, particle_filter.particles, [], meas)
+        # if i < 5 or i % 10 == 0:
+        #     visualization(robot, i, particle_filter.particles, [], meas)
             
         robot.move(steer * delta_time, throttle * delta_time)
         meas = robot.sense()
